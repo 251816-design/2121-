@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>고양시 약국 검색 지도</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Pretendard', 'Malgun Gothic', sans-serif;
+            color: #2c3e50;
+            background-color: #eef7fc;
+        }
+        .map-wrapper {
+            display: flex;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        /* 하늘색 테마 사이드바 */
+        .sidebar {
+            width: 380px;
+            height: 100%;
+            background: #ffffff;
+            border-right: 1px solid #bce0fd;
+            display: flex;
+            flex-direction: column;
+            z-index: 10;
+            box-shadow: 2px 0 10px rgba(0, 119, 182, 0.08);
+        }
+
+        /* 헤더 / 검색 영역 */
+        .sidebar-header {
+            padding: 20px 18px 15px 18px;
+            background: linear-gradient(135deg, #0077b6 0%, #0096c7 100%);
+            color: #ffffff;
+        }
+        .sidebar-header h2 {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .search-box {
+            display: flex;
+            gap: 8px;
+        }
+        .search-box input {
+            flex: 1;
+            padding: 12px 14px;
+            border: 1px solid #90e0ef;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+        .search-box input:focus {
+            border-color: #48cae4;
+            box-shadow: 0 0 0 3px rgba(72, 202, 228, 0.3);
+        }
+        
+        /* 노란색 메인 버튼 */
+        .search-box button {
+            padding: 12px 18px;
+            background-color: #ffd166;
+            color: #2b2d42;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 14px;
+            white-space: nowrap;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s ease;
+        }
+        .search-box button:hover {
+            background-color: #ffca3a;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
+        }
+        .search-box button:active {
+            transform: translateY(0);
+        }
+
+        /* 검색 정보 표시 */
+        .search-info {
+            padding: 12px 18px;
+            background: #e0f2fe;
+            border-bottom: 1px solid #bae6fd;
+            font-size: 13px;
+            color: #0369a1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* 검색 결과 목록 */
+        .place-list {
+            flex: 1;
+            overflow-y: auto;
+            list-style: none;
+            background: #f8fafc;
+        }
+        .place-item {
+            padding: 16px 18px;
+            border-bottom: 1px solid #e2e8f0;
+            background: #ffffff;
+            cursor: pointer;
+            transition: background 0.2s ease, transform 0.1s ease;
+        }
+        .place-item:hover {
+            background: #f0f9ff;
+        }
+        .place-item.active {
+            background: #e0f2fe;
+            border-left: 4px solid #0284c7;
+        }
+        .place-item h4 {
+            font-size: 15px;
+            color: #0f172a;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .place-item h4 .badge {
+            font-size: 11px;
+            background: #e0f2fe;
+            color: #0369a1;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: normal;
+        }
+        .place-item .addr {
+            font-size: 13px;
+            color: #475569;
+            margin-bottom: 4px;
+            line-height: 1.4;
+        }
+        .place-item .tel {
+            font-size: 12px;
+            color: #0284c7;
+            font-weight: 500;
+        }
+
+        /* 지도 영역 */
+        #map {
+            flex: 1;
+            height: 100%;
+        }
+
+        /* 커스텀 인포윈도우 */
+        .custom-infowindow {
+            padding: 12px 16px;
+            background: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            border: 2px solid #38bdf8;
+            font-size: 13px;
+            min-width: 180px;
+        }
+        .custom-infowindow h5 {
+            font-size: 14px;
+            color: #0369a1;
+            margin-bottom: 4px;
+            font-weight: bold;
+        }
+        .custom-infowindow p {
+            color: #64748b;
+            font-size: 12px;
+        }
+
+        /* 스크롤바 디자인 */
+        .place-list::-webkit-scrollbar {
+            width: 6px;
+        }
+        .place-list::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .place-list::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        .place-list::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+    <!-- 카카오맵 JavaScript API (요청하신 API 키 적용) -->
+    <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=469981822ad5e0ed9fbb12a18f32669e&libraries=services"></script>
+</head>
+<body>
+
+<div class="map-wrapper">
+    <!-- 하늘색 테마 사이드바 -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h2>💊 고양시 약국 검색</h2>
+            <div class="search-box">
+                <input type="text" id="keyword" placeholder="약국명 또는 동/역 이름 입력" value="주엽동" onkeypress="if(event.keyCode==13) searchPlaces()">
+                <!-- 노란색 검색 버튼 -->
+                <button onclick="searchPlaces()">검색</button>
+            </div>
+        </div>
+        
+        <div class="search-info">
+            <span>검색 결과</span>
+            <strong id="resultCount">0건</strong>
+        </div>
+
+        <ul id="placeList" class="place-list"></ul>
+    </div>
+    
+    <!-- 지도 영역 -->
+    <div id="map"></div>
+</div>
+
+<script>
+    var markers = [];
+    var selectedItemIndex = null;
+
+    // 1. 지도 초기화 (고양시 중심 좌표)
+    var mapContainer = document.getElementById('map');
+    var mapOption = {
+        center: new kakao.maps.LatLng(37.6584, 126.8320),
+        level: 5
+    };
+    var map = new kakao.maps.Map(mapContainer, mapOption);
+
+    // 2. 장소 검색 서비스 및 인포윈도우 생성
+    var ps = new kakao.maps.services.Places();
+    var infowindow = new kakao.maps.InfoWindow({ zIndex: 1 });
+
+    // 페이지 로드 시 초기 검색
+    searchPlaces();
+
+    // 3. 약국 검색 기능
+    function searchPlaces() {
+        var keyword = document.getElementById('keyword').value.trim();
+
+        if (!keyword) {
+            alert('검색어를 입력해 주세요!');
+            return;
+        }
+
+        // 고양시 지역 한정 검색어 조합
+        ps.keywordSearch('고양시 ' + keyword + ' 약국', placesSearchCB);
+    }
+
+    // 4. 검색 결과 콜백
+    function placesSearchCB(data, status, pagination) {
+        if (status === kakao.maps.services.Status.OK) {
+            displayPlaces(data);
+            document.getElementById('resultCount').innerText = data.length + '건';
+        } else if (status === kakao.maps.services.Status.ZERO_RESULT) {
+            alert('검색 결과가 없습니다.');
+            clearMap();
+            document.getElementById('resultCount').innerText = '0건';
+        } else if (status === kakao.maps.services.Status.ERROR) {
+            alert('검색 중 오류가 발생했습니다.');
+        }
+    }
+
+    // 5. 마커 및 리스트 표시
+    function displayPlaces(places) {
+        var listEl = document.getElementById('placeList');
+        var bounds = new kakao.maps.LatLngBounds();
+
+        clearMap();
+
+        for (var i = 0; i < places.length; i++) {
+            var placePosition = new kakao.maps.LatLng(places[i].y, places[i].x);
+            var marker = addMarker(placePosition, i);
+            var itemEl = getListItem(i, places[i]);
+
+            bounds.extend(placePosition);
+
+            (function(marker, place, index, itemElement) {
+                // 마커 클릭 시
+                kakao.maps.event.addListener(marker, 'click', function() {
+                    highlightItem(index);
+                    displayInfowindow(marker, place);
+                });
+
+                // 리스트 아이템 클릭 시
+                itemElement.onclick = function() {
+                    highlightItem(index);
+                    displayInfowindow(marker, place);
+                    map.panTo(new kakao.maps.LatLng(place.y, place.x));
+                };
+            })(marker, places[i], i, itemEl);
+
+            listEl.appendChild(itemEl);
+        }
+
+        map.setBounds(bounds);
+    }
+
+    // 6. 목록 아이템 생성
+    function getListItem(index, place) {
+        var el = document.createElement('li');
+        el.className = 'place-item';
+        el.id = 'place-item-' + index;
+        
+        var address = place.road_address_name ? place.road_address_name : place.address_name;
+        var phone = place.phone ? place.phone : '전화번호 미등록';
+
+        el.innerHTML = '<h4>' + place.place_name + '<span class="badge">약국</span></h4>' +
+                       '<div class="addr">' + address + '</div>' +
+                       '<div class="tel">📞 ' + phone + '</div>';
+        return el;
+    }
+
+    // 7. 마커 생성
+    function addMarker(position) {
+        var marker = new kakao.maps.Marker({
+            position: position,
+            map: map
+        });
+        markers.push(marker);
+        return marker;
+    }
+
+    // 8. 기존 지도 요소 초기화
+    function clearMap() {
+        for (var i = 0; i < markers.length; i++) {
+            markers[i].setMap(null);
+        }
+        markers = [];
+        document.getElementById('placeList').innerHTML = '';
+        infowindow.close();
+        selectedItemIndex = null;
+    }
+
+    // 9. 선택된 항목 하이라이트
+    function highlightItem(index) {
+        if (selectedItemIndex !== null) {
+            var prevEl = document.getElementById('place-item-' + selectedItemIndex);
+            if (prevEl) prevEl.classList.remove('active');
+        }
+        var curEl = document.getElementById('place-item-' + index);
+        if (curEl) {
+            curEl.classList.add('active');
+            curEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        selectedItemIndex = index;
+    }
+
+    // 10. 커스텀 스타일 인포윈도우 표시
+    function displayInfowindow(marker, place) {
+        var content = '<div class="custom-infowindow">' +
+                      '<h5>' + place.place_name + '</h5>' +
+                      '<p>' + (place.road_address_name || place.address_name) + '</p>' +
+                      '</div>';
+        infowindow.setContent(content);
+        infowindow.open(map, marker);
+    }
+</script>
+</body>
+</html>
